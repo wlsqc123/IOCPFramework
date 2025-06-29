@@ -130,8 +130,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Network\ClientSession.cpp" />
+    <ClCompile Include="Network\IocpServer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Network\ClientSession.h" />
+    <ClInclude Include="Network\IocpServer.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
