@@ -1,11 +1,12 @@
+#include "stdafx.h" 
 #include "ClientSession.h"
 #include <iostream>
 
 ClientSession::ClientSession(SOCKET socket) : _socket(socket)
 {
     memset(&_overlapped, 0, sizeof(OVERLAPPED));
-    _wsaBuf.len = MAX_BUFFER_SIZE;
-    _wsaBuf.buf = _buffer;
+    _wsa_buf.len = MAX_BUFFER_SIZE;
+    _wsa_buf.buf = _buffer;
 }
 
 ClientSession::~ClientSession() { closesocket(_socket); }
@@ -13,7 +14,7 @@ ClientSession::~ClientSession() { closesocket(_socket); }
 void ClientSession::Recv()
 {
     DWORD flags = 0;
-    if (WSARecv(_socket, &_wsaBuf, 1, NULL, &flags, &_overlapped, NULL) == SOCKET_ERROR)
+    if (WSARecv(_socket, &_wsa_buf, 1, NULL, &flags, &_overlapped, NULL) == SOCKET_ERROR)
     {
         if (WSAGetLastError() != WSA_IO_PENDING)
         {

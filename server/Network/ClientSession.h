@@ -21,6 +21,6 @@ public:
 private:
     SOCKET _socket;
     char _buffer[MAX_BUFFER_SIZE];
-    WSABUF _wsaBuf;
+    WSABUF _wsa_buf;
     OVERLAPPED _overlapped;
 };
