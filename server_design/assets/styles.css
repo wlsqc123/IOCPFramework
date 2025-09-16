@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+/* Nordic Night Color Palette */
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background-color: #2E3440;
+    color: #D8DEE9;
+}
+
+.nord-bg { background-color: #2E3440; }
+.nord-bg-light { background-color: #3B4252; }
+.nord-bg-lighter { background-color: #434C5E; }
+.nord-border { border-color: #4C566A; }
+.nord-text { color: #ECEFF4; }
+.nord-text-dim { color: #D8DEE9; }
+.nord-accent-blue { color: #88C0D0; }
+.nord-accent-green { color: #A3BE8C; }
+.nord-accent-red { color: #BF616A; }
+.nord-accent-yellow { color: #EBCB8B; }
+
+/* Sidebar Styles */
+.sidebar-link {
+    transition: all 0.2s ease-in-out;
+    border-left: 3px solid transparent;
+}
+.sidebar-link:hover, .sidebar-link.active {
+    background-color: #434C5E;
+    color: #ECEFF4;
+    border-left-color: #88C0D0;
+}
+
+/* Content Section */
+.content-section { display: none; }
+.content-section.active { display: block; }
+
+/* Module and Manager Box Styles */
+.module-column {
+    border: 1px solid #4C566A;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+.manager-box {
+    border: 1px dashed #5E81AC;
+    background-color: #434C5E;
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    text-align: center;
+}
+.manager-box:hover { background-color: #4C566A; }
+
+/* Flowchart Styles */
+.flowchart-step {
+    position: relative;
+    border: 1px dashed #4C566A;
+    background-color: #3B4252;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-align: center;
+}
+.flowchart-arrow {
+    position: relative;
+    text-align: center;
+    font-size: 2rem;
+    color: #88C0D0;
+    margin: 0.5rem 0;
+}
+
+/* Quadtree Canvas Styles */
+.quadtree-canvas {
+    background-color: #3B4252;
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.5rem;
+}
+.quadtree-boundary {
+    position: absolute;
+    border: 1px solid #4C566A;
+    box-sizing: border-box;
+}
+.quadtree-point {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: #EBCB8B;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+.query-range {
+    position: absolute;
+    background-color: rgba(163, 190, 140, 0.2);
+    border: 1px dashed #A3BE8C;
+    box-sizing: border-box;
+}
+.point-in-range {
+    background-color: #A3BE8C;
+    box-shadow: 0 0 8px #A3BE8C;
+}
+
+/* Code Block Styles */
+.code-block {
+    background-color: #272B35;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.875rem;
+    overflow-x: auto;
+}
+.code-block .keyword { color: #81A1C1; }
+.code-block .type { color: #8FBCBB; }
+.code-block .comment { color: #616E88; }
+.code-block .literal { color: #B48EAD; }
+
+/* Plan and Class Box Styles */
+.plan-week {
+    background-color: #3B4252;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.plan-task {
+    margin-left: 1rem;
+    padding-left: 1rem;
+    border-left: 2px solid #4C566A;
+}
+
+.class-box {
+    border: 1px solid #8FBCBB;
+    background-color: #434C5E;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+.class-box h4 {
+    font-weight: bold;
+    color: #ECEFF4;
+}
+.class-box ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+.class-box ul li { color: #D8DEE9; }
+
+/* Component Box Styles */
+.component-box {
+    border: 1px dashed #A3BE8C;
+    background-color: #434C5E;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+    text-align: center;
+    cursor: pointer;
+}
+.component-box:hover { background-color: #4C566A; }
+
+/* Content Card */
+.content-card {
+    background-color: #3B4252;
+    border-left: 4px solid #88C0D0;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+}
+
+/* Hit Detection Diagram */
+.hit-detection-diagram {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    height: 300px;
+    background-color: #2E3440;
+    border: 1px solid #4C566A;
+    margin: auto;
+}
+.diagram-obj {
+    position: absolute;
+    border-radius: 50%;
+}
+.caster {
+    width: 20px;
+    height: 20px;
+    background-color: #88C0D0;
+}
+.target {
+    width: 15px;
+    height: 15px;
+    background-color: #BF616A;
+}
+.target.hit {
+    background-color: #A3BE8C;
+    box-shadow: 0 0 8px #A3BE8C;
+}
+.aoe-range {
+    position: absolute;
+    border: 2px dashed #EBCB8B;
+    border-radius: 50%;
+    background-color: rgba(235, 203, 139, 0.1);
+}
+.quad-node {
+    position: absolute;
+    border: 1px dotted rgba(94, 129, 172, 0.5);
+    box-sizing: border-box;
+}
