@@ -102,10 +102,10 @@ void IocpServer::WorkerThread()
             continue;
         }
 
-        std::cout << "Received: " << std::string(clientSession->GetBuffer(), bytesTransferred) << std::endl;
+        std::cout << "Received: " << std::string(clientSession->get_buffer(), bytesTransferred) << std::endl;
 
         // Echo
-        clientSession->Send(clientSession->GetBuffer(), bytesTransferred);
+        clientSession->Send(clientSession->get_buffer(), bytesTransferred);
         clientSession->Recv();
     }
 }

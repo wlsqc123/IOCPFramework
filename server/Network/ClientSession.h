@@ -14,13 +14,16 @@ public:
     void Recv();
     void Send(const char *message, int len);
 
-    SOCKET GetSocket() const { return _socket; }
-    char *GetBuffer() { return _buffer; }
-    OVERLAPPED *GetOverlapped() { return &_overlapped; }
+
+public:
+    // Getter
+    SOCKET              get_socket() const      { return _socket; }
+    const char         *get_buffer() const      { return _buffer; }
+    const OVERLAPPED&   get_overlapped() const  { return _overlapped; }
 
 private:
-    SOCKET _socket;
-    char _buffer[MAX_BUFFER_SIZE];
-    WSABUF _wsa_buf;
-    OVERLAPPED _overlapped;
+    SOCKET      _socket;
+    OVERLAPPED  _overlapped;
+    WSABUF      _wsa_buf;
+    char        _buffer[MAX_BUFFER_SIZE];
 };
