@@ -11,7 +11,7 @@
 8. [네트워크 최적화](#8-네트워크-최적화-전략)
 9. [초기화 순서](#9-전체-초기화-순서)
 10. [성능 지표](#10-핵심-성능-지표)
-11. [면접 대비](#11-면접-대비-포인트)
+11. [Q&A 대비](#11-Q&A-대비-포인트)
 
 ---
 
@@ -51,7 +51,7 @@ graph TB
     F --> G[MySQL Slave<br/>읽기 전용]
 ```
 
-**면접 포인트:**
+**Q&A 포인트:**
 > "현재는 단일 서버지만, Zone별로 독립적인 Lock을 사용하도록 설계했습니다. 추후 Zone을 물리적으로 분리해서 여러 프로세스로 확장할 수 있습니다."
 
 ---
@@ -906,7 +906,7 @@ void Zone::MigrateToZone(PlayerRef player, int32 newZoneId)
 
 ## 7. DB 동기화 전략
 
-### Write-Back 패턴 (권장)
+### Write-Back 패턴
 
 ```mermaid
 graph LR
@@ -1072,7 +1072,7 @@ graph TD
 
 ---
 
-## 11. 면접 대비 포인트
+## 11. Q&A
 
 ### Q1. "왜 Quadtree를 사용했나요?"
 
@@ -1111,7 +1111,7 @@ graph TD
 | 1-2주 | IOCP, 링버퍼, SendBuffer 구현 |
 | 3-4주 | Protobuf, PacketHandler 자동 생성 |
 | 5-6주 | Zone, JobQueue, Game Tick |
-| 7주 | **Quadtree 구현 및 테스트** |
+| 7주 | Quadtree 구현 및 테스트 |
 | 8주 | DB 연동, Write-Back 패턴 |
 | 9-10주 | Monster AI, 전투 시스템 |
 | 11-12주 | 최적화, 부하 테스트, 문서화 |
@@ -1127,7 +1127,3 @@ graph TD
 - Inflearn - Rookiss 게임 서버 강의
 
 ---
-
-## 라이선스
-
-이 문서는 포트폴리오 작성 가이드이며, 실제 구현은 개인의 몫입니다.
