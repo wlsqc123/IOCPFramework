@@ -1043,3 +1043,4 @@ dkms.conf
 
 # copilot chat
 .idea/
+.claude/

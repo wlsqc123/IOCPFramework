@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": true,
+      "cwd": "d:/Jinjae/IOCPFramework/server",
+      "program": "d:/Jinjae/IOCPFramework/server/x64/Debug/server.exe"
+    }
+  ]
+}
