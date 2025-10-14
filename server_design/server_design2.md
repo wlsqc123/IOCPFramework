@@ -19,6 +19,10 @@
 16. [초기화 순서](#16-전체-초기화-순서)
 17. [성능 지표](#17-핵심-성능-지표)
 18. [Q&A](#18-qa)
+19. [Dump 분석 및 디버깅](#19-dump-분석-및-디버깅-전략-windows)
+20. [성능 프로파일링](#20-성능-프로파일링-visual-studio--etw)
+21. [실전 트러블슈팅](#21-실전-트러블슈팅-사례)
+22. [크래시 자동 수집](#22-크래시-자동-수집-시스템)
 
 ---
 
@@ -2133,7 +2137,7 @@ graph TB
     A[World Map<br/>10000 x 10000] --> B1[Zone 1<br/>1000x1000]
     A --> B2[Zone 2<br/>1000x1000]
     A --> B3[Zone 3<br/>1000x1000]
-    A --> B4[Zone ...<br/>총 100개]
+    A --> B4[Zone ...<br/>이 100개]
     
     B1 --> C1[Quadtree<br/>동적 공간 분할]
     B1 --> C2[독립 JobQueue]
@@ -2434,7 +2438,7 @@ int main()
 
 ---
 
-## 11. 면접 대비 포인트
+## 18. Q&A
 
 ### Q1. "왜 Quadtree를 사용했나요?"
 
@@ -2466,6 +2470,943 @@ int main()
 
 ---
 
+## 19. Dump 분석 및 디버깅 전략 (Windows)
+
+### Windows Dump 파일 종류
+
+```mermaid
+graph TB
+    A[Crash 발생] --> B{Dump 타입}
+    B -->|Mini Dump| C[MiniDumpNormal<br/>64KB~2MB<br/>스택만]
+    B -->|Full Dump| D[MiniDumpWithFullMemory<br/>수GB<br/>전체 메모리]
+    B -->|Heap Dump| E[MiniDumpWithPrivateReadWriteMemory<br/>수백MB<br/>힙 포함]
+    
+    C --> F[빠른 분석<br/>스택 트레이스]
+    D --> G[완전한 분석<br/>변수값 확인]
+    E --> H[메모리릭 분석]
+    
+    style C fill:#e1f5ff
+    style D fill:#ffe1e1
+    style E fill:#fff3cd
+```
+
+### MiniDump 자동 생성 구현
+
+```cpp
+// CrashHandler.h
+#pragma once
+#include <windows.h>
+#include <DbgHelp.h>
+#pragma comment(lib, "dbghelp.lib")
+
+class CrashHandler
+{
+public:
+    static void Initialize()
+    {
+        // 기존 핸들러 백업
+        _prevFilter = ::SetUnhandledExceptionFilter(ExceptionFilter);
+        
+        // Invalid Parameter Handler 설정
+        _set_invalid_parameter_handler(InvalidParameterHandler);
+        
+        // CRT Error Handler
+        _set_purecall_handler(PurecallHandler);
+    }
+    
+private:
+    static LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS* exceptionInfo)
+    {
+        // 덤프 파일 생성
+        CreateDumpFile(exceptionInfo);
+        
+        // 로그 남기기
+        LogCrashInfo(exceptionInfo);
+        
+        // 원래 핸들러 호출
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+    
+    static void CreateDumpFile(EXCEPTION_POINTERS* exceptionInfo)
+    {
+        // 타임스탬프로 파일명 생성
+        SYSTEMTIME st;
+        ::GetLocalTime(&st);
+        
+        wchar_t dumpPath[MAX_PATH];
+        ::swprintf_s(dumpPath, L"Crash_%04d%02d%02d_%02d%02d%02d.dmp",
+            st.wYear, st.wMonth, st.wDay,
+            st.wHour, st.wMinute, st.wSecond);
+        
+        HANDLE hFile = ::CreateFileW(
+            dumpPath,
+            GENERIC_WRITE,
+            0,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL
+        );
+        
+        if (hFile == INVALID_HANDLE_VALUE)
+            return;
+        
+        MINIDUMP_EXCEPTION_INFORMATION exceptionParam;
+        exceptionParam.ThreadId = ::GetCurrentThreadId();
+        exceptionParam.ExceptionPointers = exceptionInfo;
+        exceptionParam.ClientPointers = FALSE;
+        
+        // Dump 타입 선택 (운영/개발 환경에 따라)
+        MINIDUMP_TYPE dumpType = (MINIDUMP_TYPE)(
+            MiniDumpWithPrivateReadWriteMemory |  // 힙 메모리 포함
+            MiniDumpWithDataSegs |                 // 전역 변수
+            MiniDumpWithHandleData |               // 핸들 정보
+            MiniDumpWithFullMemoryInfo |           // 메모리 레이아웃
+            MiniDumpWithThreadInfo |               // 스레드 정보
+            MiniDumpWithUnloadedModules            // 언로드된 DLL
+        );
+        
+        BOOL success = ::MiniDumpWriteDump(
+            ::GetCurrentProcess(),
+            ::GetCurrentProcessId(),
+            hFile,
+            dumpType,
+            &exceptionParam,
+            NULL,
+            NULL
+        );
+        
+        ::CloseHandle(hFile);
+        
+        if (success)
+        {
+            LOG_CRITICAL("Crash dump created: {}", WStringToString(dumpPath));
+            
+            // 덤프 파일을 자동으로 서버에 업로드 (선택사항)
+            UploadDumpToServer(dumpPath);
+        }
+    }
+    
+    static void LogCrashInfo(EXCEPTION_POINTERS* exceptionInfo)
+    {
+        EXCEPTION_RECORD* record = exceptionInfo->ExceptionRecord;
+        
+        LOG_CRITICAL("========== CRASH REPORT ==========");
+        LOG_CRITICAL("Exception Code: 0x{:08X}", record->ExceptionCode);
+        LOG_CRITICAL("Exception Address: 0x{:016X}", 
+            reinterpret_cast<uint64>(record->ExceptionAddress));
+        
+        // 예외 코드별 메시지
+        switch (record->ExceptionCode)
+        {
+        case EXCEPTION_ACCESS_VIOLATION:
+            LOG_CRITICAL("Access Violation - Type: {}", 
+                record->ExceptionInformation[0] == 0 ? "Read" : "Write");
+            LOG_CRITICAL("Address: 0x{:016X}", 
+                record->ExceptionInformation[1]);
+            break;
+            
+        case EXCEPTION_STACK_OVERFLOW:
+            LOG_CRITICAL("Stack Overflow");
+            break;
+            
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:
+            LOG_CRITICAL("Divide By Zero");
+            break;
+        }
+        
+        // 스택 트레이스 출력
+        PrintStackTrace(exceptionInfo->ContextRecord);
+        
+        LOG_CRITICAL("==================================");
+    }
+    
+    static void PrintStackTrace(CONTEXT* context)
+    {
+        HANDLE process = ::GetCurrentProcess();
+        HANDLE thread = ::GetCurrentThread();
+        
+        // 심볼 초기화
+        ::SymInitialize(process, NULL, TRUE);
+        ::SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
+        
+        STACKFRAME64 stackFrame = {};
+        stackFrame.AddrPC.Offset = context->Rip;
+        stackFrame.AddrPC.Mode = AddrModeFlat;
+        stackFrame.AddrFrame.Offset = context->Rbp;
+        stackFrame.AddrFrame.Mode = AddrModeFlat;
+        stackFrame.AddrStack.Offset = context->Rsp;
+        stackFrame.AddrStack.Mode = AddrModeFlat;
+        
+        LOG_CRITICAL("Stack Trace:");
+        
+        for (int frame = 0; frame < 64; frame++)
+        {
+            if (!::StackWalk64(
+                IMAGE_FILE_MACHINE_AMD64,
+                process,
+                thread,
+                &stackFrame,
+                context,
+                NULL,
+                ::SymFunctionTableAccess64,
+                ::SymGetModuleBase64,
+                NULL
+            ))
+            {
+                break;
+            }
+            
+            if (stackFrame.AddrPC.Offset == 0)
+                break;
+            
+            // 심볼 정보 가져오기
+            DWORD64 displacement = 0;
+            char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+            SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(buffer);
+            symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+            symbol->MaxNameLen = MAX_SYM_NAME;
+            
+            if (::SymFromAddr(process, stackFrame.AddrPC.Offset, 
+                &displacement, symbol))
+            {
+                // 파일 및 라인 정보
+                IMAGEHLP_LINE64 line = {};
+                line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+                DWORD lineDisplacement = 0;
+                
+                if (::SymGetLineFromAddr64(process, stackFrame.AddrPC.Offset,
+                    &lineDisplacement, &line))
+                {
+                    LOG_CRITICAL("  [{}] {} - {}:{}",
+                        frame,
+                        symbol->Name,
+                        line.FileName,
+                        line.LineNumber
+                    );
+                }
+                else
+                {
+                    LOG_CRITICAL("  [{}] {} + 0x{:X}",
+                        frame,
+                        symbol->Name,
+                        displacement
+                    );
+                }
+            }
+        }
+        
+        ::SymCleanup(process);
+    }
+    
+    static void InvalidParameterHandler(
+        const wchar_t* expression,
+        const wchar_t* function,
+        const wchar_t* file,
+        unsigned int line,
+        uintptr_t reserved
+    )
+    {
+        LOG_CRITICAL("Invalid Parameter Detected!");
+        LOG_CRITICAL("Expression: {}", WStringToString(expression));
+        LOG_CRITICAL("Function: {}", WStringToString(function));
+        LOG_CRITICAL("File: {}:{}", WStringToString(file), line);
+        
+        // 덤프 생성
+        ::RaiseException(EXCEPTION_INVALID_PARAMETER, 0, 0, NULL);
+    }
+    
+    static void PurecallHandler()
+    {
+        LOG_CRITICAL("Pure Virtual Function Call!");
+        ::RaiseException(EXCEPTION_PURE_CALL, 0, 0, NULL);
+    }
+    
+    // 사용자 정의 예외 코드
+    static constexpr DWORD EXCEPTION_INVALID_PARAMETER = 0xC000041D;
+    static constexpr DWORD EXCEPTION_PURE_CALL = 0xC0000025;
+    
+    static LPTOP_LEVEL_EXCEPTION_FILTER _prevFilter;
+};
+```
+
+### WinDbg 분석 가이드
+
+```powershell
+# WinDbg 명령어 치트시트
+
+# 1. 덤프 로드 후 기본 분석
+!analyze -v    # 자동 분석 (가장 먼저 실행)
+
+# 2. 스레드 분석
+~              # 모든 스레드 목록
+~*kb           # 모든 스레드의 스택 트레이스
+~0s            # 0번 스레드로 전환
+kb             # 현재 스레드 스택 트레이스
+
+# 3. 변수 및 메모리 검사
+dv             # 로컬 변수 출력
+dt ClassName   # 클래스 구조 출력
+?? myVariable  # 변수값 출력
+dd 주소        # 메모리 덤프 (DWORD)
+dq 주소        # 메모리 덤프 (QWORD)
+
+# 4. 락 분석 (Deadlock 찾기)
+!locks         # 모든 Critical Section 상태
+!cs -l         # 락 대기 스레드
+!handle        # 핸들 정보
+
+# 5. 힙 분석 (메모리 릭)
+!heap -s       # 힙 통계
+!heap -l       # 힙 블록 누수 검사
+!heap -p -a 주소  # 특정 주소의 할당 스택
+
+# 6. 심볼 로드
+.symfix        # 심볼 서버 설정
+.reload /f     # 심볼 강제 리로드
+lm             # 로드된 모듈 목록
+```
+
+### 실전 Dump 분석 예시
+
+```cpp
+// Case 1: Access Violation 분석
+
+/*
+WinDbg Output:
+====================================
+EXCEPTION_CODE: (NTSTATUS) 0xc0000005 - Access Violation
+EXCEPTION_ADDRESS: GameServer!Zone::HandleMove+0x42
+
+STACK_TEXT:
+GameServer!Zone::HandleMove+0x42
+GameServer!lambda::operator()+0x18
+GameServer!Zone::FlushJobs+0x85
+GameServer!Zone::Update+0x23
+====================================
+
+분석:
+1. Zone::HandleMove에서 크래시
+2. 0x42 오프셋 확인
+
+dv 명령어로 로컬 변수 확인:
+player = 0x00000000  ← NULL 포인터!
+
+원인: 이미 삭제된 Player 객체에 접근
+해결: weak_ptr 사용으로 변경
+*/
+
+// 수정 전 (위험)
+void Zone::HandleMove(PlayerRef player, Protocol::C_MOVE& pkt)
+{
+    player->_posInfo = pkt.posinfo();  // player가 nullptr이면 크래시!
+}
+
+// 수정 후 (안전)
+void Zone::HandleMove(weak_ptr<Player> weakPlayer, Protocol::C_MOVE pkt)
+{
+    PlayerRef player = weakPlayer.lock();
+    if (player == nullptr)
+    {
+        LOG_WARN("Player already destroyed");
+        return;
+    }
+    
+    player->_posInfo = pkt.posinfo();
+}
+```
+
+---
+
+## 20. 성능 프로파일링 (Visual Studio + ETW)
+
+### Visual Studio Profiler 활용
+
+```mermaid
+graph LR
+    A[Profiling 도구] --> B[CPU Usage<br/>핫스팟 분석]
+    A --> C[Memory Usage<br/>힙 스냅샷]
+    A --> D[Concurrency Visualizer<br/>스레드 경합]
+    A --> E[Performance Profiler<br/>통합 분석]
+    
+    style B fill:#ffe1e1
+    style C fill:#e1ffe1
+    style D fill:#e1f5ff
+    style E fill:#fff3cd
+```
+
+### 1. CPU Profiling (샘플링)
+
+```cpp
+// Visual Studio → Debug → Performance Profiler → CPU Usage
+
+// 결과 분석 예시:
+/*
+Hot Path Analysis:
+========================
+Zone::Update               45.2%  ← 가장 높은 비중
+  ├─ FlushJobs            12.3%
+  ├─ RebuildQuadtree      28.7%  ← 병목!
+  │   └─ QuadtreeNode::Insert  25.4%
+  └─ UpdateMonsters        4.2%
+
+발견된 문제:
+- RebuildQuadtree가 매 틱마다 28.7% 소비
+- 1000개 객체 * O(log n) = 과도한 오버헤드
+
+최적화 방안:
+1. Dirty Flag 도입 (이동한 객체만 재삽입)
+2. Rebuild 주기를 5틱에 1번으로 조정
+*/
+
+// 최적화 전
+void Zone::Update(uint64 deltaTick)
+{
+    FlushJobs();
+    RebuildQuadtree();  // 매 틱마다 전체 재구성!
+    UpdateMonsters(deltaTick);
+}
+
+// 최적화 후
+class Zone
+{
+    int32 _quadtreeRebuildCounter = 0;
+    unordered_set<int32> _dirtyObjects;  // 이동한 객체만
+    
+    void Update(uint64 deltaTick)
+    {
+        FlushJobs();
+        
+        // 5틱마다 또는 Dirty 객체 많으면
+        if (++_quadtreeRebuildCounter >= 5 || _dirtyObjects.size() > 100)
+        {
+            RebuildQuadtree();
+            _quadtreeRebuildCounter = 0;
+            _dirtyObjects.clear();
+        }
+        
+        UpdateMonsters(deltaTick);
+    }
+    
+    void HandleMove(PlayerRef player, Protocol::C_MOVE& pkt)
+    {
+        player->_posInfo = pkt.posinfo();
+        _dirtyObjects.insert(player->_objectId);  // Dirty 마킹
+    }
+};
+
+// 결과: CPU 사용률 45% → 22% (2배 향상!)
+```
+
+### 2. Memory Profiling (힙 스냅샷)
+
+```cpp
+// Visual Studio → Memory Usage → Take Snapshot
+
+/*
+Snapshot Comparison (1분 간격):
+================================
+Diff #1 → #2:
+  std::string:      +2,450 instances (+1.2 MB)  ← 메모리 릭!
+  SendBuffer:       +15 instances (+240 KB)
+  GameObject:       -5 instances
+  
+분석:
+- std::string이 1분에 2,450개씩 증가
+- SendBuffer 일부 미반환
+
+원인 추적:
+1. Allocation Stack 확인
+   → PacketHandler::HandleChat에서 생성
+2. 로그 메시지가 해제되지 않음
+*/
+
+// 문제 코드
+void PacketHandler::HandleChat(Protocol::C_CHAT& pkt)
+{
+    string* msg = new string(pkt.msg());  // 누수!
+    LOG_INFO("Chat: {}", *msg);
+    // delete 없음!
+}
+
+// 수정
+void PacketHandler::HandleChat(Protocol::C_CHAT& pkt)
+{
+    const string& msg = pkt.msg();  // 복사 없음
+    LOG_INFO("Chat: {}", msg);
+}
+```
+
+### 3. Concurrency Visualizer (Lock 경합)
+
+```cpp
+// Visual Studio → Concurrency Visualizer
+
+/*
+분석 결과:
+===================
+Thread Timeline:
+----------------------------------------------------
+Thread 1 (IOCP):    ████▓▓▓▓████▓▓▓▓████
+Thread 2 (IOCP):    ████▓▓▓▓████▓▓▓▓████
+Thread 3 (Game):    ████████████████████
+
+▓ = Blocking (Lock 대기)
+█ = Running
+
+발견:
+- IOCP 스레드가 40% 시간을 Lock 대기
+- _sessionManagerLock이 주범
+
+해결: Lock-Free 구조로 변경
+*/
+
+// Before (Lock 경합)
+class SessionManager
+{
+    mutex _lock;
+    map<int32, SessionRef> _sessions;
+    
+    void Add(SessionRef session)
+    {
+        lock_guard<mutex> lock(_lock);  // ← 8개 스레드가 대기!
+        _sessions[session->GetId()] = session;
+    }
+};
+
+// After (Lock-Free)
+class SessionManager
+{
+    // 각 IOCP 스레드가 독립적인 맵 소유
+    array<map<int32, SessionRef>, 8> _sessionMaps;
+    
+    void Add(SessionRef session)
+    {
+        int32 threadId = GetCurrentIOCPThreadId();
+        _sessionMaps[threadId][session->GetId()] = session;  // Lock 없음!
+    }
+    
+    SessionRef Get(int32 sessionId)
+    {
+        // 모든 맵 순회 (읽기는 빠름)
+        for (auto& map : _sessionMaps)
+        {
+            auto it = map.find(sessionId);
+            if (it != map.end())
+                return it->second;
+        }
+        return nullptr;
+    }
+};
+
+// 결과: Lock 대기 시간 40% → 5% (8배 향상!)
+```
+
+### ETW (Event Tracing for Windows) 활용
+
+```cpp
+// ETW Provider 등록
+#include <evntprov.h>
+#pragma comment(lib, "Advapi32.lib")
+
+class ETWProvider
+{
+public:
+    static void Initialize()
+    {
+        GUID providerGuid = { /* GUID */ };
+        ::EventRegister(&providerGuid, NULL, NULL, &_handle);
+    }
+    
+    static void LogEvent(const char* msg, int32 level)
+    {
+        EVENT_DESCRIPTOR descriptor;
+        EventDescCreate(&descriptor, 1, 0, 0, level, 0, 0, 0);
+        
+        EVENT_DATA_DESCRIPTOR data;
+        EventDataDescCreate(&data, msg, strlen(msg) + 1);
+        
+        ::EventWrite(_handle, &descriptor, 1, &data);
+    }
+    
+private:
+    static REGHANDLE _handle;
+};
+
+// xperf로 추적
+// xperf -start GameServer -on GUID
+// xperf -stop GameServer -d trace.etl
+// xperfview trace.etl
+```
+
+---
+
+## 21. 실전 트러블슈팅 사례
+
+### Case 1: Zone Tick Time 급증 (100ms → 500ms)
+
+```cpp
+// 증상: 갑자기 게임이 버벅임
+
+/*
+분석 과정:
+1. Grafana 대시보드 확인
+   - Zone 1번만 Tick Time 500ms
+   - 다른 Zone은 정상
+   
+2. Profiler 붙여서 확인
+   - UpdateMonsters에서 95% 시간 소비
+   
+3. 로그 확인
+   - "Monster pathfinding timeout" 대량 발생
+   
+원인:
+- Zone 1에 Player 1000명 밀집
+- Monster 500마리가 동시에 A* 실행
+- A* 계산 = 500 * 10ms = 5초!
+
+해결책:
+*/
+
+// 1차 해결: A* 프레임 분산
+class Monster
+{
+    int32 _pathfindingFrame = 0;
+    
+    void Update(uint64 deltaTick)
+    {
+        // 10프레임마다 1번씩만 A* 실행
+        if (++_pathfindingFrame >= 10)
+        {
+            FindPath();
+            _pathfindingFrame = 0;
+        }
+        
+        FollowPath();
+    }
+};
+
+// 2차 해결: A* Job Pool (백그라운드)
+class PathfindingJobPool
+{
+    thread_pool<4> _pool;
+    
+    void RequestPath(MonsterRef monster, PosInfo target)
+    {
+        _pool.submit([monster, target]() {
+            vector<PosInfo> path = AStar::FindPath(
+                monster->_posInfo, target);
+            
+            // 결과를 Monster의 Job Queue에 전달
+            monster->_zone->PushJob([monster, path]() {
+                monster->SetPath(path);
+            });
+        });
+    }
+};
+
+// 결과: Tick Time 500ms → 80ms
+```
+
+### Case 2: 메모리 누수 (24시간 후 10GB → 50GB)
+
+```cpp
+/*
+증상: 서버가 24시간마다 재시작 필요
+
+분석:
+1. Memory Usage 모니터링
+   - 시간당 1.5GB씩 증가
+   
+2. WinDbg !heap -s 실행
+   - std::function 관련 메모리가 다수
+   
+3. 코드 검토
+   - Job Lambda에서 shared_ptr 순환 참조!
+*/
+
+// 문제 코드
+void Player::Attack(GameObjectRef target)
+{
+    // ❌ Lambda가 this를 캡처 → shared_ptr 순환!
+    _zone->PushJob([this, target]() {
+        // Player → Zone → Job → Player (순환!)
+        DoDamage(target);
+    });
+}
+
+// 해결
+void Player::Attack(GameObjectRef target)
+{
+    // ✅ weak_ptr 사용
+    weak_ptr<Player> weakSelf = shared_from_this();
+    
+    _zone->PushJob([weakSelf, target]() {
+        PlayerRef self = weakSelf.lock();
+        if (self == nullptr) return;
+        
+        self->DoDamage(target);
+    });
+}
+
+// 추가 도구: UMDH (User-Mode Dump Heap)
+// gflags.exe /i GameServer.exe +ust
+// umdh -p:PID -f:snapshot1.log
+// (1시간 후)
+// umdh -p:PID -f:snapshot2.log
+// umdh snapshot1.log snapshot2.log -f:leak.log
+```
+
+### Case 3: Deadlock (서버 응답 없음)
+
+```cpp
+/*
+증상: 서버가 갑자기 멈춤
+
+분석:
+1. Dump 생성 (ProcDump)
+   procdump -ma GameServer.exe crash.dmp
+   
+2. WinDbg !locks 실행
+   CritSec 0x12345678 LOCKED (Thread 3)
+   CritSec 0x87654321 LOCKED (Thread 5)
+   
+3. ~*kb로 스레드 스택 확인
+*/
+
+// Deadlock 발견
+/*
+Thread 3:
+  Zone::HandleMove
+    └─ Player::BroadcastMove
+        └─ SessionManager::GetSession (Lock A 대기)
+
+Thread 5:
+  SessionManager::OnDisconnect (Lock A 보유)
+    └─ Zone::RemovePlayer (Lock B 대기)
+        
+Thread 3이 Lock B 보유!
+→ Circular Wait: A → B → A
+*/
+
+// 해결: Lock Ordering
+class LockHierarchy
+{
+    enum Order
+    {
+        SESSION_MANAGER = 1,
+        ZONE = 2,
+        PLAYER = 3
+    };
+    
+    // 항상 낮은 순서부터 획득
+};
+
+// 또는 Lock-Free 구조 사용
+```
+
+---
+
+## 22. 크래시 자동 수집 시스템
+
+### 아키텍처
+
+```mermaid
+graph LR
+    A[Game Server] -->|Crash| B[CrashHandler]
+    B -->|Dump| C[Local Storage]
+    B -->|HTTP POST| D[Crash Server]
+    
+    D --> E[S3 Bucket]
+    D --> F[DB 저장]
+    
+    E --> G[WinDbg<br/>분석]
+    F --> H[Crash Dashboard]
+    
+    style B fill:#ffe1e1
+    style D fill:#e1ffe1
+```
+
+### 구현
+
+```cpp
+// CrashReporter.h
+class CrashReporter
+{
+public:
+    static void UploadDumpToServer(const wstring& dumpPath)
+    {
+        // 비동기 업로드 (서버 종료 지연 방지)
+        thread uploadThread([dumpPath]() {
+            try
+            {
+                // HTTP Multipart Upload
+                CURL* curl = curl_easy_init();
+                
+                curl_mime* form = curl_mime_init(curl);
+                curl_mimepart* field = curl_mime_addpart(form);
+                
+                curl_mime_name(field, "dump");
+                curl_mime_filedata(field, WStringToString(dumpPath).c_str());
+                
+                // 서버 정보 추가
+                field = curl_mime_addpart(form);
+                curl_mime_name(field, "version");
+                curl_mime_data(field, SERVER_VERSION, CURL_ZERO_TERMINATED);
+                
+                field = curl_mime_addpart(form);
+                curl_mime_name(field, "timestamp");
+                curl_mime_data(field, GetTimestamp().c_str(), 
+                    CURL_ZERO_TERMINATED);
+                
+                curl_easy_setopt(curl, CURLOPT_URL, 
+                    "https://crash-server.example.com/upload");
+                curl_easy_setopt(curl, CURLOPT_MIMEPOST, form);
+                
+                CURLcode res = curl_easy_perform(curl);
+                
+                if (res == CURLE_OK)
+                {
+                    LOG_INFO("Dump uploaded successfully");
+                }
+                
+                curl_mime_free(form);
+                curl_easy_cleanup(curl);
+            }
+            catch (...)
+            {
+                LOG_ERROR("Failed to upload dump");
+            }
+        });
+        
+        uploadThread.detach();
+    }
+};
+
+// 크래시 알림 (로그 + 콘솔)
+void SendCrashAlert(const string& crashInfo)
+{
+    // 1. 중요 로그 파일에 기록
+    LOG_CRITICAL("=== CRASH ALERT ===");
+    LOG_CRITICAL("Time: {}", GetTimestamp());
+    LOG_CRITICAL("Version: {}", SERVER_VERSION);
+    LOG_CRITICAL("Exception: {}", crashInfo);
+    LOG_CRITICAL("==================");
+    
+    // 2. 콘솔에 출력 (모니터링 시 즉시 확인)
+    std::cerr << "\n";
+    std::cerr << "!!! CRASH DETECTED !!!\n";
+    std::cerr << "Check crash dump file\n";
+    std::cerr << "\n";
+    
+    // 3. Windows 이벤트 로그에도 기록 (선택사항)
+    HANDLE hEventLog = ::RegisterEventSourceW(NULL, L"GameServer");
+    if (hEventLog != NULL)
+    {
+        const wchar_t* message = L"Game Server Crashed";
+        ::ReportEventW(hEventLog, EVENTLOG_ERROR_TYPE, 0, 0, 
+            NULL, 1, 0, &message, NULL);
+        ::DeregisterEventSource(hEventLog);
+    }
+}
+```
+
+### Crash Dashboard (Grafana + DB)
+
+```sql
+-- crashes 테이블
+CREATE TABLE crashes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    version VARCHAR(20),
+    exception_code VARCHAR(20),
+    exception_address VARCHAR(50),
+    stack_trace TEXT,
+    dump_path VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_version (version),
+    INDEX idx_exception (exception_code),
+    INDEX idx_created (created_at)
+);
+
+-- 빈도 높은 크래시 조회
+SELECT 
+    exception_code,
+    LEFT(stack_trace, 100) as crash_location,
+    COUNT(*) as count
+FROM crashes
+WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+GROUP BY exception_code, LEFT(stack_trace, 100)
+ORDER BY count DESC
+LIMIT 10;
+```
+
+---
+
+## 추가 권장 도구
+
+### Windows Performance Toolkit
+
+```powershell
+# 설치
+# Windows SDK에 포함
+
+# CPU 샘플링
+wpr -start CPU -filemode
+
+# 30초 실행 후
+wpr -stop trace.etl
+
+# Windows Performance Analyzer로 열기
+wpa trace.etl
+```
+
+### Intel VTune Profiler
+
+```cpp
+// VTune API 사용
+#include <ittnotify.h>
+
+__itt_domain* domain = __itt_domain_create("GameServer");
+
+void Zone::Update(uint64 deltaTick)
+{
+    __itt_task_begin(domain, __itt_null, __itt_null, 
+        __itt_string_handle_create("Zone::Update"));
+    
+    FlushJobs();
+    RebuildQuadtree();
+    UpdateMonsters(deltaTick);
+    
+    __itt_task_end(domain);
+}
+```
+
+---
+
+## 면접 포인트 💡
+
+> **"Dump 분석 경험이 있나요?"**
+> 
+> "네, WinDbg를 사용해 Access Violation과 Deadlock을 분석한 경험이 있습니다. 
+> Access Violation의 경우 `!analyze -v`로 크래시 지점을 파악하고, `dv`로 로컬 변수 확인 후 nullptr 접근을 발견했습니다.
+> Deadlock은 `!locks` 명령으로 Lock 순서를 분석해 Circular Wait를 찾아냈고, Lock Hierarchy를 도입해 해결했습니다."
+
+> **"성능 병목을 어떻게 찾나요?"**
+>
+> "Visual Studio Profiler의 CPU Usage로 Hot Path를 먼저 확인합니다.
+> RebuildQuadtree가 28%를 차지하는 것을 발견해 Dirty Flag 패턴으로 최적화했고, CPU 사용률을 45%에서 22%로 절반 줄였습니다.
+> Memory Profiler로는 힙 스냅샷 비교를 통해 Lambda의 순환 참조 메모리 릭을 찾아냈습니다."
+
+> **"크래시 발생 시 어떻게 대응하나요?"**
+>
+> "자동으로 MiniDump를 생성하고 중요 로그에 기록하도록 구현했습니다.
+> 덤프 파일은 S3에 자동 업로드되며, DB에 크래시 통계를 저장해 Grafana로 빈도 높은 크래시를 모니터링합니다.
+> Windows 이벤트 로그에도 기록되어 시스템 모니터링 도구와 연동 가능합니다.
+> 이를 통해 크래시 발생 후 5분 내에 분석을 시작할 수 있습니다."
+
+---
+
 ## 프로젝트 타임라인
 
 | 주차 | 목표 |
@@ -2476,7 +3417,8 @@ int main()
 | 7주 | **Quadtree 구현 및 테스트** |
 | 8주 | DB 연동, Write-Back 패턴 |
 | 9-10주 | Monster AI, 전투 시스템 |
-| 11-12주 | 최적화, 부하 테스트, 문서화 |
+| 11주 | **Dump 분석 시스템, Profiling** |
+| 12주 | 최적화, 부하 테스트, 문서화 |
 
 ---
 
@@ -2494,6 +3436,12 @@ int main()
 - [Jump Point Search](https://zerowidth.com/2013/a-visual-explanation-of-jump-point-search.html)
 - [Behavior Tree](https://www.gamedeveloper.com/programming/behavior-trees-for-ai-how-they-work)
 
+### 디버깅 & 프로파일링
+- [WinDbg Documentation](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/)
+- [Visual Studio Profiler](https://docs.microsoft.com/en-us/visualstudio/profiling/)
+- [ETW (Event Tracing for Windows)](https://docs.microsoft.com/en-us/windows/win32/etw/about-event-tracing)
+- [Intel VTune Profiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/vtune-profiler.html)
+
 ### 프로토콜 & 데이터베이스
 - [Google Protocol Buffers](https://protobuf.dev/)
 - [MySQL C++ Connector](https://dev.mysql.com/doc/connector-cpp/8.0/en/)
@@ -2508,8 +3456,10 @@ int main()
 - Udemy - Multiplayer Game Programming
 
 ### 오픈소스 참고
-- [Boost.Asio](https://www.boost.org/doc/libs/1_81_0/doc/html/boost_asio.html)
-- [libzmq](https://github.com/zeromq/libzmq)
+- [IOCP Echo Server Example](https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/Win7Samples/netds/winsock/iocp) - Microsoft 공식 IOCP 샘플
+- [Winsock2 Documentation](https://docs.microsoft.com/en-us/windows/win32/winsock/windows-sockets-start-page-2) - Windows Socket API 레퍼런스
+- [GameNetworkingSockets (Valve)](https://github.com/ValveSoftware/GameNetworkingSockets) - Steam 네트워크 라이브러리 (아키텍처 참고)
+- [RakNet Documentation](http://www.raknet.com/) - 게임 네트워킹 패턴 및 최적화 기법
 
 ---
 
@@ -2530,12 +3480,19 @@ int main()
 - 패킷 전송: Delta Compression + Aggregation (40% 절감) ✅
 - JobQueue: Lock-Free MPSC (4.7배 향상) ✅
 
+=== Debugging & Profiling ===
+- Dump 자동 수집: WinDbg 즉시 분석 가능 ✅
+- CPU Profiling: Hot Path 식별 및 최적화 ✅
+- Memory Profiling: 순환 참조 메모리 릭 해결 ✅
+- Concurrency 분석: Lock 경합 8배 개선 ✅
+
 === 최종 결과 ===
 - CCU: 10,000명 동시 접속 안정화 ✅
 - 평균 Latency: 20ms ✅
 - CPU 사용률: 35% → 18% (50% 절감) ✅
 - 메모리 사용: 1.2GB (Object Pool 덕분) ✅
 - 네트워크 대역폭: 100MB/s → 60MB/s (40% 절감) ✅
+- Crash 대응 시간: 평균 5분 (자동 수집) ✅
 ```
 
 ---
@@ -2545,17 +3502,18 @@ int main()
 ```markdown
 # 🎮 MMORPG Game Server (C++ / MySQL)
 
-> 취업용 포트폴리오 프로젝트 - Lock-Free, Quadtree, Behavior Tree 적용
+> 취업용 포트폴리오 프로젝트 - Lock-Free, Quadtree, Behavior Tree, Dump 분석 적용
 
 ## 🚀 주요 기술 스택
 
 - **Language**: C++17
 - **Database**: MySQL 8.0
-- **Network**: IOCP (Windows) / epoll (Linux)
+- **Network**: IOCP (Windows)
 - **Protocol**: Google Protocol Buffers
 - **Monitoring**: Prometheus + Grafana
+- **Debugging**: WinDbg, Visual Studio Profiler, ETW
 
-## 🏗️ 아키텍처
+## 🗺️ 아키텍처
 
 [아키텍처 다이어그램 이미지]
 
@@ -2563,6 +3521,7 @@ int main()
 - **공간 분할**: Quadtree (O(log n) 범위 검색)
 - **동시성 제어**: Lock-Free MPSC Queue (4.7배 향상)
 - **메모리 관리**: TLS Object Pool (12.5배 향상)
+- **디버깅**: 자동 Dump 수집 + WinDbg 분석
 
 ## ✨ 핵심 기능
 
@@ -2581,10 +3540,11 @@ int main()
 - ✅ Packet Sequence 검증
 - ✅ 서버 권위 모델
 
-### 4. 모니터링
+### 4. 모니터링 & 디버깅
 - ✅ Prometheus + Grafana 실시간 대시보드
-- ✅ Alert 시스템
-- ✅ 성능 프로파일링
+- ✅ WinDbg 자동 Dump 수집
+- ✅ Visual Studio Profiler 성능 분석
+- ✅ 크래시 로그 & 이벤트 추적
 
 ## 📊 성능 지표
 
@@ -2594,6 +3554,7 @@ int main()
 | Tick Time | 평균 65ms ✅ |
 | Packet/sec | 80,000 ✅ |
 | Latency | 평균 20ms ✅ |
+| Crash 대응 | 5분 이내 ✅ |
 
 ## 🛠️ 빌드 및 실행
 
@@ -2614,6 +3575,7 @@ make -j4
 
 - [아키텍처 상세 설계](docs/architecture.md)
 - [성능 최적화 과정](docs/optimization.md)
+- [Dump 분석 가이드](docs/debugging.md)
 - [API 문서](docs/api.md)
 
 ## 🎯 학습 포인트
@@ -2625,6 +3587,7 @@ make -j4
 3. **공간 알고리즘**: Quadtree, A*, NavMesh
 4. **AI 설계**: Behavior Tree, 데이터 기반 AI
 5. **시스템 설계**: 확장 가능한 서버 아키텍처
+6. **디버깅 & 프로파일링**: WinDbg, Visual Studio Profiler, ETW
 
 ## 📧 Contact
 
@@ -2658,6 +3621,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Packet Aggregation
 - [x] Anti-Cheat System
 
+### ✅ 디버깅 & 프로파일링
+- [x] WinDbg Dump 자동 수집
+- [x] Visual Studio Profiler 활용
+- [x] Concurrency Visualizer 분석
+- [x] ETW 성능 추적
+- [x] Crash Dashboard (Grafana)
+
 ### ✅ 운영
 - [x] Prometheus + Grafana
 - [x] 부하 테스트 (봇 1000개)
@@ -2666,7 +3636,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 라이선스
+## 라이센스
 
 이 문서는 포트폴리오 작성 가이드입니다. 실제 구현은 개인의 몫입니다.
 
