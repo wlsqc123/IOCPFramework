@@ -1,29 +1,49 @@
 # MMORPG 게임 서버 아키텍처 설계 (취업 포트폴리오)
 
 ## 목차
+
+### Part 1: 핵심 아키텍처
 1. [전체 시스템 구성](#1-전체-시스템-구성)
 2. [스레드 아키텍처](#2-스레드-아키텍처)
 3. [링버퍼 기반 패킷 조립](#3-링버퍼-기반-패킷-조립)
 4. [Quadtree 공간 분할](#4-quadtree-공간-분할)
 5. [Lock-Free 자료구조](#5-lock-free-자료구조)
-6. [Delta Compression](#6-delta-compression-차분-압축)
+
+### Part 2: 네트워크 최적화
+6. [Delta Compression (차분 압축)](#6-delta-compression-차분-압축)
 7. [Object Pool 고도화](#7-object-pool-고도화)
-8. [Behavior Tree AI](#8-behavior-tree-ai)
-9. [A* Pathfinding](#9-a-pathfinding--navmesh)
-10. [Packet Aggregation](#10-packet-aggregation-패킷-묶기)
+8. [Packet Aggregation (패킷 묶기)](#10-packet-aggregation-패킷-묶기)
+
+### Part 3: 게임 로직
+9. [Behavior Tree AI](#8-behavior-tree-ai)
+10. [A* Pathfinding](#9-a-pathfinding--navmesh)
 11. [Anti-Cheat System](#11-anti-cheat-system)
-12. [실시간 모니터링](#12-실시간-성능-모니터링)
-13. [데이터 흐름](#13-데이터-흐름---패킷-처리-전-과정)
-14. [Zone 격리 전략](#14-zone-격리-전략)
-15. [DB 동기화 전략](#15-db-동기화-전략)
+
+### Part 4: 데이터 관리
+12. [데이터 흐름 (패킷 처리 전 과정)](#13-데이터-흐름---패킷-처리-전-과정)
+13. [Zone 격리 전략](#14-zone-격리-전략)
+14. [DB 동기화 전략](#15-db-동기화-전략)
+
+### Part 5: 운영 및 모니터링
+15. [실시간 성능 모니터링](#12-실시간-성능-모니터링)
 16. [초기화 순서](#16-전체-초기화-순서)
-17. [성능 지표](#17-핵심-성능-지표)
-18. [Q&A](#18-qa)
-19. [Dump 분석 및 디버깅](#19-dump-분석-및-디버깅-전략-windows)
-20. [성능 프로파일링](#20-성능-프로파일링-visual-studio--etw)
-21. [실전 트러블슈팅](#21-실전-트러블슈팅-사례)
-22. [크래시 자동 수집](#22-크래시-자동-수집-시스템)
-23. [C++17/20 Modern Features](#23-c1720-modern-features-활용)
+17. [핵심 성능 지표](#17-핵심-성능-지표)
+
+### Part 6: 디버깅 및 프로파일링
+18. [Dump 분석 및 디버깅 전략 (Windows)](#18-dump-분석-및-디버깅-전략-windows)
+19. [성능 프로파일링 (Visual Studio + ETW)](#19-성능-프로파일링-visual-studio--etw)
+20. [실전 트러블슈팅 사례](#20-실전-트러블슈팅-사례)
+21. [크래시 로깅 시스템](#21-크래시-로깅-시스템)
+
+### Part 7: Modern C++
+22. [C++17/20 Modern Features 활용](#22-c1720-modern-features-활용)
+
+### Appendix
+- [Q&A](#qa)
+- [프로젝트 타임라인](#프로젝트-타임라인)
+- [참고 자료](#참고-자료)
+- [성능 개선 로그](#성능-개선-로그-포트폴리오-강점)
+- [최종 체크리스트](#최종-체크리스트)
 
 ---
 
@@ -48,7 +68,7 @@ graph TB
 - 단일 프로세스에서 **멀티스레딩**과 **동시성 제어**를 제대로 보여주는 게 핵심
 - 확장은 Phase 2로 미루고, 먼저 동작하는 것 만들기
 
-### Phase 2: 확장 구조 (선택사항)
+**Phase 2: 확장 구조 (선택사항)**
 
 ```mermaid
 graph TB
@@ -2429,7 +2449,7 @@ int main()
 
 ---
 
-## 18. Q&A
+## Q&A
 
 ### Q1. "왜 Quadtree를 사용했나요?"
 
@@ -2459,9 +2479,56 @@ int main()
 - Zone 간 이동은 **JobQueue**로 직렬화
 - Quadtree는 Game Tick Thread만 접근
 
----
+### Q5. "서버 권위 모델이 뭔가요?"
 
-## 19. Dump 분석 및 디버깅 전략 (Windows)
+**답변:**
+"클라이언트를 신뢰하지 않는 원칙입니다. 클라이언트는 '의도'만 전송하고, 
+모든 검증과 계산은 서버에서 수행합니다.
+
+예를 들어 공격 시:
+- 클라이언트: "몬스터 공격" (데미지 값 없음)
+- 서버: 사거리, 쿨다운 검증 → 데미지 계산 → 결과 적용
+
+이렇게 하면 메모리 해킹이나 패킷 변조로 치팅할 수 없습니다."
+
+### Q6. "Lock-Free를 왜 사용했나요?"
+
+**답변:**
+"Zone의 JobQueue를 Lock-Free MPSC로 구현해서 4.7배 성능 향상을 달성했습니다.
+여러 IOCP 스레드가 동시에 Job을 Push하는 상황에서 Lock 경합이 병목이었습니다.
+CAS 연산과 Memory Ordering을 활용했고, ABA 문제는 Version Counter로 해결했습니다."
+
+### Q7. "Dump 분석은 어떻게 하나요?"
+
+**답변:**
+"WinDbg를 사용합니다. `!analyze -v`로 크래시 지점을 파악하고, 
+`dv` 명령으로 로컬 변수를 확인합니다.
+Access Violation의 경우 nullptr 접근을 빠르게 찾을 수 있고,
+Deadlock은 `!locks` 명령으로 Lock 순서를 분석해 Circular Wait를 발견했습니다."
+
+### Q8. "성능 병목은 어떻게 찾았나요?"
+
+**답변:**
+"Visual Studio Profiler의 CPU Usage로 Hot Path를 확인했습니다.
+RebuildQuadtree가 28%를 차지하는 것을 발견해 Dirty Flag 패턴으로 최적화했고,
+CPU 사용률을 45%에서 22%로 절반 줄였습니다.
+Memory Profiler로는 힙 스냅샷을 비교해서 Lambda의 순환 참조 메모리 릭을 찾아냈습니다."
+
+### Q9. "C++20 Modules의 장점은?"
+
+**답변:**
+"컴파일 시간을 68% 단축했습니다 (5분 23초 → 1분 42초).
+헤더 중복 포함 문제가 사라지고, 매크로 격리가 가능해졌습니다.
+서드파티 라이브러리와의 호환성 문제는 Global Module Fragment로 해결했습니다."
+
+### Q10. "왜 Crash Server를 만들지 않았나요?"
+
+**답변:**
+"로컬 파일 기반으로 충분합니다. MiniDump와 crash.log로 모든 디버깅 정보를 확보할 수 있고,
+외부 의존성이 없어 심플합니다.
+실무에서는 회사의 모니터링 시스템에 통합하면 되므로, 범용적인 파일 기반이 더 유연합니다."
+
+## 프로젝트 타임라인
 
 ### Windows Dump 파일 종류
 
@@ -2809,7 +2876,7 @@ void Zone::HandleMove(weak_ptr<Player> weakPlayer, Protocol::C_MOVE pkt)
 
 ---
 
-## 20. 성능 프로파일링 (Visual Studio + ETW)
+## 19. 성능 프로파일링 (Visual Studio + ETW)
 
 ### Visual Studio Profiler 활용
 
@@ -3032,7 +3099,7 @@ private:
 
 ---
 
-## 21. 실전 트러블슈팅 사례
+## 20. 실전 트러블슈팅 사례
 
 ### Case 1: Zone Tick Time 급증 (100ms → 500ms)
 
@@ -3198,7 +3265,7 @@ class LockHierarchy
 
 ---
 
-## 22. 크래시 로깅 시스템
+## 21. 크래시 로깅 시스템
 
 ### 아키텍처
 
@@ -3571,35 +3638,7 @@ Logs/
 
 ---
 
-## 면접 포인트 💡
-
-> **"크래시 발생 시 어떻게 대응하나요?"**
->
-> "자동으로 MiniDump와 상세 로그를 남기도록 구현했습니다.
-> 
-> crash.log 파일에는 예외 타입, 주소, 스택 트레이스가 기록되어
-> 간단한 버그는 로그만으로도 즉시 파악할 수 있습니다.
-> 
-> 복잡한 버그는 Dump 파일을 WinDbg로 열어 변수값과 메모리 상태를 
-> 분석합니다. Windows Event Log에도 기록되어 시스템 관리 도구와 
-> 연동할 수 있습니다.
-> 
-> 로컬 파일 기반이라 외부 의존성 없이 간단하지만,
-> 필요한 모든 디버깅 정보를 확보할 수 있습니다."
-
-> **"왜 클라우드 업로드나 Crash Server를 안 만들었나요?"**
->
-> "포트폴리오의 목적은 '핵심 기술 구현 능력 증명'입니다.
-> 
-> Crash Server 구축은 인프라 작업이지 C++ 게임 서버의 핵심이 아닙니다.
-> 오히려 로컬 파일 기반이 더 실용적이고 심플합니다.
-> 
-> 실무에서는 회사의 모니터링 시스템에 맞춰 통합하면 되므로,
-> 범용적인 파일 기반 로깅이 오히려 유연합니다."
-
----
-
-## 23. C++17/20 Modern Features 활용
+## 22. C++17/20 Modern Features 활용
 
 ### C++20 Modules로 컴파일 시간 단축
 
@@ -4150,11 +4189,9 @@ target_link_libraries(GameServer PRIVATE GameServerModules)
 
 ---
 
-## 면접 포인트 💡
+## Q&A
 
-> **"C++20을 실전에서 사용해봤나요?"**
->
-> "네, 이 프로젝트에서 C++20의 주요 기능들을 적극 활용했습니다.
+> **"C++20의 어떤 기능을 사용했나요?"**
 > 
 > **Modules**로 컴파일 시간을 68% 단축했고, 헤더 의존성 문제를 근본적으로 해결했습니다.
 > 
@@ -4178,14 +4215,8 @@ target_link_libraries(GameServer PRIVATE GameServerModules)
 
 ---
 
-## 기술 스택 업데이트
+## 기술 스택
 
-**변경 전:**
-```
-- Language: C++17
-```
-
-**변경 후:**
 ```
 - Language: C++20 (Modules, Concepts, Coroutines, Ranges)
 - Compiler: MSVC 19.35+ / GCC 11+ / Clang 15+
@@ -4251,9 +4282,7 @@ void Zone::Update(uint64 deltaTick)
 }
 ```
 
----
-
-## 면접 포인트 💡
+## Q&A
 
 > **"Dump 분석 경험이 있나요?"**
 > 
