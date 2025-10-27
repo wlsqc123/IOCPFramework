@@ -1,9 +1,8 @@
 #pragma once
 #include "../stdafx.h"
+import config.network;
 
-#define MAX_BUFFER_SIZE 1024
-
-// °¢ Å¬¶óÀÌ¾ðÆ®¿ÍÀÇ ¼¼¼ÇÀ» °ü¸®. Å¬¶óÀÌ¾ðÆ® ¼ÒÄÏ, µ¥ÀÌÅÍ ¹öÆÛ, I/O ÀÛ¾÷À» Ã³¸®.
+// ï¿½ï¿½ Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½. Å¬ï¿½ï¿½ï¿½Ì¾ï¿½Æ® ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½, I/O ï¿½Û¾ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½.
 
 class ClientSession
 {
@@ -25,5 +24,5 @@ private:
     SOCKET      _socket;
     OVERLAPPED  _overlapped;
     WSABUF      _wsa_buf;
-    char        _buffer[MAX_BUFFER_SIZE];
+    char        _buffer[Config::Network::MAX_BUFFER_SIZE];
 };

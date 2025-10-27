@@ -1,13 +1,14 @@
 #include "stdafx.h"
 #include <iostream>
 #include "./core/network/IocpServer.h"
+import config.network;
 
 int main()
 {
     IocpServer server;
-    if (server.Start(9000))
+    if (server.Start(Config::Network::DEFAULT_SERVER_PORT))
     {
-        // ¼­¹ö°¡ Á¾·áµÉ ¶§±îÁö ´ë±â (¿¹: ÄÜ¼Ö ÀÔ·Â)
+        // ì„œë²„ê°€ ì‹œì‘ëœ ì´í›„ì˜ ë¡œì§ (ì˜ˆ: ì½˜ì†” ì…ë ¥)
         std::cout << "Press Enter to stop the server..." << std::endl;
         std::cin.get();
         server.Stop();
