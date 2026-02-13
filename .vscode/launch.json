@@ -2,14 +2,28 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "C/C++ Runner: Debug Session",
+      "name": "Debug: IOCPServer",
       "type": "cppvsdbg",
       "request": "launch",
+      "program": "${workspaceFolder}/build/bin/Debug/IOCPServer.exe",
       "args": [],
       "stopAtEntry": false,
-      "externalConsole": true,
-      "cwd": "d:/Jinjae/IOCPFramework/server",
-      "program": "d:/Jinjae/IOCPFramework/server/x64/Debug/server.exe"
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "console": "integratedTerminal",
+      "preLaunchTask": "CMake: Build Debug"
+    },
+    {
+      "name": "Release: IOCPServer",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/Release/IOCPServer.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "console": "integratedTerminal",
+      "preLaunchTask": "CMake: Build Release"
     }
   ]
 }
