@@ -2,10 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug: IOCPServer",
+      "name": "Debug: Server",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/bin/Debug/IOCPServer.exe",
+      "program": "${workspaceFolder}/build/bin/Debug/Server.exe",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
@@ -14,10 +14,22 @@
       "preLaunchTask": "CMake: Build Debug"
     },
     {
-      "name": "Release: IOCPServer",
+      "name": "Debug: Client",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/bin/Release/IOCPServer.exe",
+      "program": "${workspaceFolder}/build/bin/Debug/Client.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "console": "integratedTerminal",
+      "preLaunchTask": "CMake: Build Debug"
+    },
+    {
+      "name": "Release: Server",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/bin/Release/Server.exe",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

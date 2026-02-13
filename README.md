@@ -12,8 +12,14 @@ cmake --build . --config Debug
 
 ## 실행
 
+**서버:**
 ```bash
-./build/bin/Debug/IOCPServer.exe
+./build/bin/Debug/Server.exe
+```
+
+**클라이언트:**
+```bash
+./build/bin/Debug/Client.exe
 ```
 
 ## 프로젝트 구조
@@ -21,11 +27,12 @@ cmake --build . --config Debug
 ```
 IOCPFramework/
 ├── common/          # 공용 타입 정의
-├── engine/          # IOCP 네트워크 엔진
+├── server/          # IOCP 게임 서버
 │   ├── iocp/       # IOCP Core
 │   ├── session/    # 세션 관리
 │   ├── buffer/     # 버퍼 시스템
 │   └── packet/     # 패킷 처리
+├── client/          # 테스트 클라이언트
 └── bot/            # 스트레스 테스트 봇
 ```
 

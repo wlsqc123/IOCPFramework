@@ -44,5 +44,5 @@ target_compile_features(engine PUBLIC cxx_std_20)
 # Main Executable
 # =============================================================================
 
-add_executable(IOCPServer main.cpp)
-target_link_libraries(IOCPServer PRIVATE engine)
+add_executable(Server main.cpp)
+target_link_libraries(Server PRIVATE engine)
