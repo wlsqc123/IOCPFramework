@@ -29,16 +29,9 @@ if(MSVC)
         /MP                 # Multi-processor compilation
     )
 
-    # Enable Address Sanitizer in Debug mode
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        add_compile_options(/fsanitize=address)
-    endif()
-
-    # Optimization for Release
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(/O2 /GL)
-        add_link_options(/LTCG)
-    endif()
+    # Optimization for Release (generator expression for multi-config)
+    add_compile_options($<$<CONFIG:Release>:/O2> $<$<CONFIG:Release>:/GL>)
+    add_link_options($<$<CONFIG:Release>:/LTCG>)
 endif()
 
 # =============================================================================
