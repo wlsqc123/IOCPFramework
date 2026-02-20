@@ -21,6 +21,15 @@ file(GLOB_RECURSE ENGINE_HEADERS
     "timer/*.h"
 )
 
+file(GLOB_RECURSE ENGINE_MODULES
+    "iocp/*.ixx"
+    "session/*.ixx"
+    "buffer/*.ixx"
+    "packet/*.ixx"
+    "coroutine/*.ixx"
+    "timer/*.ixx"
+)
+
 # Create engine library
 add_library(engine STATIC
     ${ENGINE_SOURCES}
@@ -39,6 +48,7 @@ target_link_libraries(engine PUBLIC
 
 # C++20 features
 target_compile_features(engine PUBLIC cxx_std_20)
+target_sources(engine PUBLIC FILE_SET CXX_MODULES FILES ${ENGINE_MODULES})
 
 # =============================================================================
 # Main Executable

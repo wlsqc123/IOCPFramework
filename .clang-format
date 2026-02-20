@@ -1,0 +1,19 @@
+Language: Cpp
+Standard: c++20
+
+# 탭(Tab) 사용
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
+
+# 중괄호 새 줄에서 시작 (Allman Style)
+BreakBeforeBraces: Allman
+
+# 함수나 블록을 한 줄로 압축하지 않음
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# 들여쓰기 기타 설정
+IndentCaseLabels: true

@@ -1,139 +1,152 @@
-#include "IOCPCore.h"
+module;
+
+#include <WinSock2.h>
+#include <Windows.h>
 #include <cstdio>
+#include <optional>
 
-namespace IOCPFramework {
+module iocp_core;
 
-IOCPCore::IOCPCore()
-    : m_hIOCP(INVALID_HANDLE_VALUE)
+IOCPCore::IOCPCore() : m_hIOCP(INVALID_HANDLE_VALUE)
 {
 }
 
-IOCPCore::~IOCPCore() {
-    Close();
-}
-
-IOCPCore::IOCPCore(IOCPCore&& other) noexcept
-    : m_hIOCP(other.m_hIOCP)
+IOCPCore::~IOCPCore()
 {
-    other.m_hIOCP = INVALID_HANDLE_VALUE;
+	close();
 }
 
-IOCPCore& IOCPCore::operator=(IOCPCore&& other) noexcept {
-    if (this != &other) {
-        Close();
-        m_hIOCP = other.m_hIOCP;
-        other.m_hIOCP = INVALID_HANDLE_VALUE;
-    }
-    return *this;
+IOCPCore::IOCPCore(IOCPCore &&other) noexcept : m_hIOCP(other.m_hIOCP)
+{
+	other.m_hIOCP = INVALID_HANDLE_VALUE;
 }
 
-bool IOCPCore::Init(u32 concurrentThreads) {
-    if (IsValid()) {
-        printf("[IOCPCore] Already initialized\n");
-        return false;
-    }
+IOCPCore &IOCPCore::operator=(IOCPCore &&other) noexcept
+{
+	if (this != &other)
+	{
+		close();
 
-    m_hIOCP = CreateIoCompletionPort(
-        INVALID_HANDLE_VALUE,
-        nullptr,
-        0,
-        static_cast<DWORD>(concurrentThreads)
-    );
+		m_hIOCP = other.m_hIOCP;
+		other.m_hIOCP = INVALID_HANDLE_VALUE;
+	}
 
-    if (m_hIOCP == nullptr) {
-        printf("[IOCPCore] CreateIoCompletionPort failed: %lu\n", GetLastError());
-        m_hIOCP = INVALID_HANDLE_VALUE;
-        return false;
-    }
-
-    printf("[IOCPCore] Initialized (concurrentThreads: %u)\n", concurrentThreads);
-    return true;
+	return *this;
 }
 
-bool IOCPCore::Register(HANDLE handle, u64 completionKey) {
-    if (!IsValid()) {
-        printf("[IOCPCore] Not initialized\n");
-        return false;
-    }
+bool IOCPCore::init(uint32 concurrentThreads)
+{
+	if (true == isValid())
+	{
+		printf("[IOCPCore] Already initialized\n");
 
-    HANDLE result = CreateIoCompletionPort(
-        handle,
-        m_hIOCP,
-        static_cast<ULONG_PTR>(completionKey),
-        0
-    );
+		return false;
+	}
 
-    if (result != m_hIOCP) {
-        printf("[IOCPCore] Register failed: %lu\n", GetLastError());
-        return false;
-    }
+	m_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, static_cast<DWORD>(concurrentThreads));
 
-    return true;
+	if (m_hIOCP == nullptr)
+	{
+		printf("[IOCPCore] CreateIoCompletionPort failed: %lu\n", GetLastError());
+
+		m_hIOCP = INVALID_HANDLE_VALUE;
+
+		return false;
+	}
+
+	printf("[IOCPCore] Initialized (concurrentThreads: %u)\n", concurrentThreads);
+
+	return true;
 }
 
-std::optional<CompletionResult> IOCPCore::Dispatch(u32 timeoutMs) {
-    if (!IsValid()) {
-        return std::nullopt;
-    }
+bool IOCPCore::registerHandle(HANDLE handle, uint64 completionKey)
+{
+	if (false == isValid())
+	{
+		printf("[IOCPCore] Not initialized\n");
 
-    DWORD bytesTransferred = 0;
-    ULONG_PTR completionKey = 0;
-    OVERLAPPED* pOverlapped = nullptr;
+		return false;
+	}
 
-    BOOL result = GetQueuedCompletionStatus(
-        m_hIOCP,
-        &bytesTransferred,
-        &completionKey,
-        &pOverlapped,
-        static_cast<DWORD>(timeoutMs)
-    );
+	HANDLE result = CreateIoCompletionPort(handle, m_hIOCP, static_cast<ULONG_PTR>(completionKey), 0);
 
-    if (pOverlapped == nullptr) {
-        if (!result) {
-            DWORD error = GetLastError();
-            if (error != WAIT_TIMEOUT) {
-                printf("[IOCPCore] GetQueuedCompletionStatus error: %lu\n", error);
-            }
-        }
-        return std::nullopt;
-    }
+	if (result != m_hIOCP)
+	{
+		printf("[IOCPCore] Register failed: %lu\n", GetLastError());
 
-    CompletionResult completion{};
-    completion.completionKey   = static_cast<u64>(completionKey);
-    completion.pOverlapped     = IOCPOverlapped::FromOverlapped(pOverlapped);
-    completion.bytesTransferred = static_cast<u32>(bytesTransferred);
-    completion.success         = (result == TRUE);
+		return false;
+	}
 
-    return completion;
+	return true;
 }
 
-bool IOCPCore::PostCompletion(u64 completionKey, IOCPOverlapped* pOverlapped) {
-    if (!IsValid()) {
-        printf("[IOCPCore] Not initialized\n");
-        return false;
-    }
+std::optional<CompletionResult> IOCPCore::dispatch(uint32 timeoutMs)
+{
+	if (false == isValid())
+	{
+		return std::nullopt;
+	}
 
-    BOOL result = PostQueuedCompletionStatus(
-        m_hIOCP,
-        0,
-        static_cast<ULONG_PTR>(completionKey),
-        pOverlapped ? reinterpret_cast<OVERLAPPED*>(pOverlapped) : nullptr
-    );
+	DWORD bytesTransferred = 0;
+	ULONG_PTR completionKey = 0;
+	OVERLAPPED *pOverlapped = nullptr;
 
-    if (!result) {
-        printf("[IOCPCore] PostQueuedCompletionStatus failed: %lu\n", GetLastError());
-        return false;
-    }
+	BOOL result = GetQueuedCompletionStatus(m_hIOCP, &bytesTransferred, &completionKey, &pOverlapped, static_cast<DWORD>(timeoutMs));
 
-    return true;
+	if (nullptr == pOverlapped)
+	{
+		if (false == result)
+		{
+			DWORD error = GetLastError();
+
+			if (WAIT_TIMEOUT != error)
+			{
+				printf("[IOCPCore] GetQueuedCompletionStatus error: %lu\n", error);
+			}
+		}
+
+		return std::nullopt;
+	}
+
+	CompletionResult completion{};
+	completion.completionKey = static_cast<uint64>(completionKey);
+	completion.pOverlapped = IOCPOverlapped::fromOverlapped(pOverlapped);
+	completion.bytesTransferred = static_cast<uint32>(bytesTransferred);
+	completion.success = (result == TRUE);
+
+	return completion;
 }
 
-void IOCPCore::Close() {
-    if (IsValid()) {
-        printf("[IOCPCore] Closing IOCP handle\n");
-        CloseHandle(m_hIOCP);
-        m_hIOCP = INVALID_HANDLE_VALUE;
-    }
+bool IOCPCore::postCompletion(uint64 completionKey, IOCPOverlapped *pOverlapped)
+{
+	if (false == isValid())
+	{
+		printf("[IOCPCore] Not initialized\n");
+
+		return false;
+	}
+
+	BOOL result = PostQueuedCompletionStatus(m_hIOCP, 0, static_cast<ULONG_PTR>(completionKey),
+											pOverlapped ? reinterpret_cast<OVERLAPPED *>(pOverlapped) : nullptr);
+
+	if (false == result)
+	{
+		printf("[IOCPCore] PostQueuedCompletionStatus failed: %lu\n", GetLastError());
+		
+		return false;
+	}
+
+	return true;
 }
 
-} // namespace IOCPFramework
+void IOCPCore::close()
+{
+	if (true == isValid())
+	{
+		printf("[IOCPCore] Closing IOCP handle\n");
+
+		CloseHandle(m_hIOCP);
+
+		m_hIOCP = INVALID_HANDLE_VALUE;
+	}
+}
