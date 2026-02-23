@@ -39,7 +39,7 @@ export {
 		bool registerHandle(HANDLE handle, uint64 completionKey);
 
 		// 완료 통지 대기 (타임아웃 시 nullopt)
-		std::optional<CompletionResult> dispatch(uint32 timeoutMs = INFINITE);
+		std::optional<CompletionResult> dispatch(uint32 timeoutMs = 1000);
 
 		// 사용자 정의 완료 패킷 전송 (예: 종료 신호)
 		bool postCompletion(uint64 completionKey, IOCPOverlapped *pOverlapped = nullptr);
