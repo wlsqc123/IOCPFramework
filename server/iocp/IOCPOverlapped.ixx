@@ -10,10 +10,11 @@ import types;
 export {
 	enum class IOOperation : uint8
 	{
-		RECV = 1,
-		SEND = 2,
-		ACCEPT = 3,
-		DISCONNECT = 4,
+		NONE		= 0,
+		RECV		= 1,
+		SEND		= 2,
+		ACCEPT		= 3,
+		DISCONNECT	= 4,
 	};
 
 	struct IOCPOverlapped
@@ -31,7 +32,7 @@ export {
 		void reset()
 		{
 			ZeroMemory(&overlapped, sizeof(WSAOVERLAPPED));
-			operation = IOOperation::RECV;
+			operation = IOOperation::NONE;
 			sessionId = 0;
 			ownerPtr = nullptr;
 		}
