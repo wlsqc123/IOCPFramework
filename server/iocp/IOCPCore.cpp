@@ -112,7 +112,8 @@ std::optional<CompletionResult> IOCPCore::dispatch(uint32 timeoutMs)
 	completion.completionKey = static_cast<uint64>(completionKey);
 	completion.pOverlapped = IOCPOverlapped::fromOverlapped(pOverlapped);
 	completion.bytesTransferred = static_cast<uint32>(bytesTransferred);
-	completion.success = (result == TRUE);
+	completion.success = (TRUE == result);
+	completion.errorCode = (TRUE == result) ? 0 : GetLastError();
 
 	return completion;
 }

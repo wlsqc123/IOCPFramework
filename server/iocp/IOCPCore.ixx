@@ -16,6 +16,7 @@ export {
 		uint64			completionKey;		// 등록 시 부여한 고유 식별자 (Session ID)
 		IOCPOverlapped	*pOverlapped;		// 완료된 작업의 컨텍스트 (작업 유형, 세션/버퍼 정보)
 		uint32			bytesTransferred;	// 실제 송수신된 바이트 수
+		uint32			errorCode;			// IO 실패 시 GetLastError() 값 (success == true이면 0)
 		bool			success;			// IO 작업 성공 여부
 	};
 
