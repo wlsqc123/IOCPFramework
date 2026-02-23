@@ -1,9 +1,13 @@
 #include <cstdio>
+#include <atomic>
+#include <chrono>
+#include <thread>
 #include <utility>
 
 import types;
 import iocp_overlapped;
 import iocp_core;
+import worker_thread_pool;
 
 int main()
 {
@@ -11,8 +15,8 @@ int main()
 	printf("IOCPFramework v0.1.0\n");
 	printf("========================================\n\n");
 
-	// 1. IOCP 생성 테스트
 	IOCPCore iocp;
+
 	if (false == iocp.init(0))
 	{
 		printf("[FAIL] IOCPCore Init\n");
@@ -21,74 +25,81 @@ int main()
 	}
 	printf("[PASS] IOCPCore Init\n");
 
-	// 2. 유효성 테스트
-	if (false == iocp.isValid())
+	// 1. Worker Thread Pool 기동 테스트
+	std::atomic<int> handledCount = 0;
+
+	WorkerThreadPool pool;
+
+	bool started = pool.start(iocp, [&](const CompletionResult &result)
 	{
-		printf("[FAIL] IsValid\n");
+		printf("[Handler] key=%llu sessionId=%llu op=%d bytes=%u\n",
+			result.completionKey,
+			result.pOverlapped->sessionId,
+			static_cast<int>(result.pOverlapped->operation),
+			result.bytesTransferred);
+
+		handledCount.fetch_add(1, std::memory_order_relaxed);
+	}, 2);
+
+	if (false == started)
+	{
+		printf("[FAIL] WorkerThreadPool Start\n");
 
 		return 1;
 	}
-	printf("[PASS] IsValid\n");
+	printf("[PASS] WorkerThreadPool Start (%u threads)\n", pool.threadCount());
 
-	// 3. PostCompletion -> Dispatch 테스트
-	IOCPOverlapped testOv;
-	testOv.operation = IOOperation::RECV;
-	testOv.sessionId = 42;
+	// 2. 테스트 — 3개의 가짜 완료 패킷 전송
+	IOCPOverlapped overlapped1;
+	overlapped1.operation = IOOperation::RECV;
+	overlapped1.sessionId = 1;
 
-	if (false == iocp.postCompletion(100, &testOv))
+	IOCPOverlapped overlapped2;
+	overlapped2.operation = IOOperation::SEND;
+	overlapped2.sessionId = 2;
+
+	IOCPOverlapped overlapped3;
+	overlapped3.operation = IOOperation::ACCEPT;
+	overlapped3.sessionId = 3;
+
+	iocp.postCompletion(1, &overlapped1);
+	iocp.postCompletion(2, &overlapped2);
+	iocp.postCompletion(3, &overlapped3);
+
+	// 3. 핸들러가 처리할 시간 대기
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+	if (3 != handledCount.load())
 	{
-		printf("[FAIL] PostCompletion\n");
+		printf("[FAIL] Expected 3 handled completions, got %d\n", handledCount.load());
+
+		pool.stop();
 
 		return 1;
 	}
-	printf("[PASS] PostCompletion\n");
+	printf("[PASS] All 3 completions handled\n");
 
-	auto result = iocp.dispatch(1000);
-	if (false == result.has_value())
+	// 4. 종료 신호 전송 및 stop 테스트
+	// threadCount()만큼 SHUTDOWN_KEY 전송 — 각 스레드가 하나씩 수신
+	uint32 count = pool.threadCount();
+
+	for (uint32 index = 0; index < count; ++index)
 	{
-		printf("[FAIL] Dispatch returned nullopt\n");
+		iocp.postCompletion(WorkerThreadPool::SHUTDOWN_KEY);
+	}
+
+	pool.stop();
+
+	if (true == pool.isRunning())
+	{
+		printf("[FAIL] Pool should be stopped\n");
 
 		return 1;
 	}
-
-	if (100 != result->completionKey || 42 != result->pOverlapped->sessionId ||
-		IOOperation::RECV != result->pOverlapped->operation)
-	{
-		printf("[FAIL] Dispatch data mismatch\n");
-
-		return 1;
-	}
-	printf("[PASS] Dispatch (key=%llu, sessionId=%llu, op=RECV)\n",
-		   result->completionKey, result->pOverlapped->sessionId);
-
-	// 4. Move semantics 테스트
-	IOCPCore iocp2 = std::move(iocp);
-	if (true == iocp.isValid())
-	{
-		printf("[FAIL] Original should be invalid after move\n");
-
-		return 1;
-	}
-	if (false == iocp2.isValid())
-	{
-		printf("[FAIL] Moved target should be valid\n");
-
-		return 1;
-	}
-	printf("[PASS] Move semantics\n");
-
-	// 5. Dispatch 타임아웃 테스트
-	auto timeout = iocp2.dispatch(0);
-	if (true == timeout.has_value())
-	{
-		printf("[FAIL] Empty queue should return nullopt\n");
-
-		return 1;
-	}
-	printf("[PASS] Dispatch timeout\n");
+	printf("[PASS] WorkerThreadPool Stop\n");
 
 	printf("\n========================================\n");
-	printf("All IOCPCore tests passed!\n");
+	printf("All WorkerThreadPool tests passed!\n");
 	printf("========================================\n");
 
 	return 0;
