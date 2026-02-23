@@ -51,7 +51,7 @@ export {
 
 		bool isValid() const
 		{
-			return INVALID_HANDLE_VALUE != m_hIOCP && nullptr != m_hIOCP;
+			return INVALID_HANDLE_VALUE != m_hIOCP && nullptr != m_hIOCP; // TODO: nullptr 체크 필요 여부 검토 (CICP 실패 시 INVALID_HANDLE_VALUE 반환)
 		}
 
 	  private:
