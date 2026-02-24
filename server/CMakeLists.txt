@@ -3,7 +3,7 @@
 # =============================================================================
 
 # Collect all engine source files
-file(GLOB_RECURSE ENGINE_SOURCES
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
     "iocp/*.cpp"
     "session/*.cpp"
     "buffer/*.cpp"
@@ -12,7 +12,7 @@ file(GLOB_RECURSE ENGINE_SOURCES
     "timer/*.cpp"
 )
 
-file(GLOB_RECURSE ENGINE_HEADERS
+file(GLOB_RECURSE ENGINE_HEADERS CONFIGURE_DEPENDS
     "iocp/*.h"
     "session/*.h"
     "buffer/*.h"
@@ -21,7 +21,7 @@ file(GLOB_RECURSE ENGINE_HEADERS
     "timer/*.h"
 )
 
-file(GLOB_RECURSE ENGINE_MODULES
+file(GLOB_RECURSE ENGINE_MODULES CONFIGURE_DEPENDS
     "iocp/*.ixx"
     "session/*.ixx"
     "buffer/*.ixx"
