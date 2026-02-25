@@ -47,7 +47,7 @@ export {
 	  private:
 		void workerLoop(IOCPCore *pIOCPCore, CompletionHandler handler);
 
-		std::vector<std::thread> m_threads;
+		std::vector<std::jthread> m_threads;
 		std::atomic<bool>        m_running;
 	};
 }

@@ -35,7 +35,7 @@ bool WorkerThreadPool::start(IOCPCore &iocpCore, CompletionHandler handler, uint
 
 	if (0 == threadCount)
 	{
-		threadCount = static_cast<uint32>(std::thread::hardware_concurrency());
+		threadCount = static_cast<uint32>(std::jthread::hardware_concurrency());
 
 		if (0 == threadCount)
 		{
@@ -67,14 +67,16 @@ void WorkerThreadPool::stop()
 	m_running = false;
 
 	// dispatch 타임아웃(1초)마다 m_running을 재확인하여 자연 종료
-	// 즉시 종료가 필요하면 호출 측에서 threadCount()만큼 SHUTDOWN_KEY를 postCompletion할 것
-	for (std::thread &thread : m_threads)
-	{
-		if (true == thread.joinable())
-		{
-			thread.join();
-		}
-	}
+	// 즉시 종료가 필요하면 호출 측에서 threadCount()만큼 SHUTDOWN_KEY를 post completion할 것
+	// 아래 코드는 jthread로 전환하면서 삭제 처리
+	// TODO: 테스트 후 아래 코드 아예 삭제 처리
+	//for (std::jthread &thread : m_threads) 
+	//{
+	//	if (true == thread.joinable())
+	//	{
+	//		thread.join();
+	//	}
+	//}
 
 	m_threads.clear();
 
