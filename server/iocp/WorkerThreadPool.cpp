@@ -17,7 +17,7 @@ WorkerThreadPool::~WorkerThreadPool()
 	stop();
 }
 
-bool WorkerThreadPool::start(IOCPCore &iocpCore, CompletionHandler handler, uint32 threadCount)
+bool WorkerThreadPool::start(IOCPCore& iocpCore, CompletionHandler handler, uint32 threadCount)
 {
 	if (true == m_running)
 	{
@@ -83,7 +83,7 @@ void WorkerThreadPool::stop()
 	printf("[WorkerThreadPool] Stopped\n");
 }
 
-void WorkerThreadPool::workerLoop(IOCPCore *pIOCPCore, CompletionHandler handler)
+void WorkerThreadPool::workerLoop(IOCPCore* pIOCPCore, CompletionHandler handler)
 {
 	printf("[WorkerThreadPool] Thread started (id: %lu)\n", GetCurrentThreadId());
 

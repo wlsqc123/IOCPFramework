@@ -21,7 +21,7 @@ export {
 	{
 		WSAOVERLAPPED	overlapped;	// !!반드시 첫 번째 멤버!! - 위치 수정 X
 		SessionId		sessionId;	// 소유 세션 ID (0 = 미할당)
-		void			*ownerPtr;	// 추가 컨텍스트
+		void*			ownerPtr;	// 추가 컨텍스트
 		IOOperation		operation;
 
 		IOCPOverlapped()
@@ -37,9 +37,9 @@ export {
 			ownerPtr = nullptr;
 		}
 
-		static IOCPOverlapped *fromOverlapped(OVERLAPPED *pOverlapped)
+		static IOCPOverlapped* fromOverlapped(OVERLAPPED* pOverlapped)
 		{
-			return reinterpret_cast<IOCPOverlapped *>(pOverlapped);
+			return reinterpret_cast<IOCPOverlapped*>(pOverlapped);
 		}
 	};
 }

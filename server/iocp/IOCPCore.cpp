@@ -21,7 +21,7 @@ IOCPCore::IOCPCore(IOCPCore &&other) noexcept : m_hIOCP(other.m_hIOCP)
 	other.m_hIOCP = INVALID_HANDLE_VALUE;
 }
 
-IOCPCore &IOCPCore::operator=(IOCPCore &&other) noexcept
+IOCPCore& IOCPCore::operator=(IOCPCore&& other) noexcept
 {
 	if (this != &other)
 	{
@@ -89,7 +89,7 @@ std::optional<CompletionResult> IOCPCore::dispatch(uint32 timeoutMs)
 
 	DWORD bytesTransferred = 0;
 	ULONG_PTR completionKey = 0;
-	OVERLAPPED *pOverlapped = nullptr;
+	OVERLAPPED* pOverlapped = nullptr;
 
 	BOOL result = GetQueuedCompletionStatus(m_hIOCP, &bytesTransferred, &completionKey, &pOverlapped, static_cast<DWORD>(timeoutMs));
 
@@ -118,7 +118,7 @@ std::optional<CompletionResult> IOCPCore::dispatch(uint32 timeoutMs)
 	return completion;
 }
 
-bool IOCPCore::postCompletion(uint64 completionKey, IOCPOverlapped *pOverlapped)
+bool IOCPCore::postCompletion(uint64 completionKey, IOCPOverlapped* pOverlapped)
 {
 	if (false == isValid())
 	{
@@ -128,7 +128,7 @@ bool IOCPCore::postCompletion(uint64 completionKey, IOCPOverlapped *pOverlapped)
 	}
 
 	BOOL result = PostQueuedCompletionStatus(m_hIOCP, 0, static_cast<ULONG_PTR>(completionKey),
-											pOverlapped ? reinterpret_cast<OVERLAPPED *>(pOverlapped) : nullptr);
+											pOverlapped ? reinterpret_cast<OVERLAPPED*>(pOverlapped) : nullptr);
 
 	if (false == result)
 	{

@@ -46,7 +46,7 @@ int main()
 
 	WorkerThreadPool pool;
 
-	bool started = pool.start(iocp, [&](const CompletionResult &result)
+	bool started = pool.start(iocp, [&](const CompletionResult& result)
 	{
 		if (nullptr != result.pOverlapped && IOOperation::ACCEPT == result.pOverlapped->operation)
 		{
@@ -127,7 +127,7 @@ int main()
 	// 5. Acceptor 테스트 — 새 Pool 재기동 후 실제 TCP 연결 수용
 	WorkerThreadPool pool2;
 
-	bool started2 = pool2.start(iocp, [&](const CompletionResult &result)
+	bool started2 = pool2.start(iocp, [&](const CompletionResult& result)
 	{
 		if (nullptr != result.pOverlapped && IOOperation::ACCEPT == result.pOverlapped->operation)
 		{
@@ -173,7 +173,7 @@ int main()
 	serverAddress.sin_port        = htons(7777);
 	serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-	connect(clientSocket, reinterpret_cast<SOCKADDR *>(&serverAddress), sizeof(serverAddress));
+	connect(clientSocket, reinterpret_cast<SOCKADDR*>(&serverAddress), sizeof(serverAddress));
 
 	// Worker Thread가 ACCEPT 완료 통지를 처리할 시간 대기
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));

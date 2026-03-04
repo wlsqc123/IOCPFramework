@@ -47,7 +47,7 @@ Acceptor::~Acceptor()
 
 // === Orchestrator ===
 
-bool Acceptor::start(IOCPCore &iocpCore, uint16 port, AcceptHandler onAccept)
+bool Acceptor::start(IOCPCore& iocpCore, uint16 port, AcceptHandler onAccept)
 {
 	if (true == m_listening)
 	{
@@ -102,7 +102,7 @@ void Acceptor::stop()
 	printf("[Acceptor] Stopped\n");
 }
 
-void Acceptor::onAcceptComplete(const CompletionResult &result)
+void Acceptor::onAcceptComplete(const CompletionResult& result)
 {
 	if (false == result.success)
 	{
@@ -133,7 +133,7 @@ void Acceptor::onAcceptComplete(const CompletionResult &result)
 	m_acceptContext->acceptSocket = INVALID_SOCKET;
 
 	// listen 소켓의 속성(로컬 주소 등)을 클라이언트 소켓에 상속
-	setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<char *>(&m_listenSocket), sizeof(m_listenSocket));
+	setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, reinterpret_cast<char*>(&m_listenSocket), sizeof(m_listenSocket));
 
 	m_acceptHandler(clientSocket);
 
@@ -245,7 +245,7 @@ bool Acceptor::bindAndListen(SOCKET socket, uint16 port)
 	address.sin_port        = htons(port);
 	address.sin_addr.s_addr = INADDR_ANY;
 
-	if (SOCKET_ERROR == bind(socket, reinterpret_cast<SOCKADDR *>(&address), sizeof(address)))
+	if (SOCKET_ERROR == bind(socket, reinterpret_cast<SOCKADDR*>(&address), sizeof(address)))
 	{
 		printf("[Acceptor] bind failed: %d\n", WSAGetLastError());
 

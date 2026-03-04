@@ -25,10 +25,10 @@ export {
 		~AcceptContext();
 
 		// 복사/이동 금지 — ownerPtr이 this를 가리키므로 주소 고정 필요
-		AcceptContext(const AcceptContext &) = delete;
-		AcceptContext &operator=(const AcceptContext &) = delete;
-		AcceptContext(AcceptContext &&) = delete;
-		AcceptContext &operator=(AcceptContext &&) = delete;
+		AcceptContext(const AcceptContext&) = delete;
+		AcceptContext& operator=(const AcceptContext&) = delete;
+		AcceptContext(AcceptContext&&) = delete;
+		AcceptContext& operator=(AcceptContext&&) = delete;
 
 		IOCPOverlapped overlappedContext;				// 반드시 첫번째 멤버
 		SOCKET acceptSocket = INVALID_SOCKET;			// AcceptEx에 미리 생성해 두는 클라이언트 소켓
@@ -45,19 +45,19 @@ export {
 		Acceptor();
 		~Acceptor();
 
-		Acceptor(const Acceptor &) = delete;
-		Acceptor &operator=(const Acceptor &) = delete;
-		Acceptor(Acceptor &&) = delete;
-		Acceptor &operator=(Acceptor &&) = delete;
+		Acceptor(const Acceptor&) = delete;
+		Acceptor& operator=(const Acceptor&) = delete;
+		Acceptor(Acceptor&&) = delete;
+		Acceptor& operator=(Acceptor&&) = delete;
 
 		// Listen 소켓 생성 + bind + listen + IOCP 등록 + AcceptEx 최초 발행
-		bool start(IOCPCore &iocpCore, uint16 port, AcceptHandler onAccept);
+		bool start(IOCPCore& iocpCore, uint16 port, AcceptHandler onAccept);
 
 		// Listen 소켓 닫기 (진행 중인 AcceptEx는 ERROR_OPERATION_ABORTED(995)로 완료)
 		void stop();
 
 		// Worker Thread의 CompletionHandler에서 IOOperation::ACCEPT 수신 시 호출
-		void onAcceptComplete(const CompletionResult &result);
+		void onAcceptComplete(const CompletionResult& result);
 
 		bool isListening() const;
 
@@ -72,7 +72,7 @@ export {
 
 		SOCKET			m_listenSocket = INVALID_SOCKET;
 		LPFN_ACCEPTEX	m_lpfnAcceptEx = nullptr;
-		IOCPCore	   *m_pIOCPCore = nullptr;
+		IOCPCore*		m_pIOCPCore = nullptr;
 		AcceptHandler	m_acceptHandler;
 
 		std::unique_ptr<AcceptContext>	m_acceptContext;
